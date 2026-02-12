@@ -276,7 +276,7 @@ canvas {
   let mergeGroups = new Map();   // gid -> { fruitIndex, bodies: Set, startTime, constraints: [] }
   let bodyToGroup = new Map();   // body.id -> gid
   let nextGroupId = 0;
-  const MERGE_TIME = 5000;      // 5 seconds
+  const MERGE_TIME = 3500;      // 3.5 seconds
 
   const DROP_Y = 60;
   const WALL_THICKNESS = 20;
@@ -288,7 +288,12 @@ canvas {
   }
 
   function randomSmallFruit() {
-    return Math.floor(Math.random() * 5);
+    // Mostly small fruits, but occasionally medium ones
+    const r = Math.random();
+    if (r < 0.08) return 5;       // 8%: りんご
+    if (r < 0.20) return 4;       // 12%: かき
+    if (r < 0.40) return 3;       // 20%: デコポン
+    return Math.floor(Math.random() * 3); // 60%: さくらんぼ/いちご/ぶどう
   }
 
   function init() {
@@ -316,7 +321,7 @@ canvas {
     if (render) Render.stop(render);
 
     engine = Engine.create({
-      gravity: { x: 0, y: 1.8 }
+      gravity: { x: 0, y: 2.5 }
     });
 
     render = Render.create({
@@ -446,7 +451,7 @@ canvas {
 
     setTimeout(() => {
       canDrop = true;
-    }, 400);
+    }, 300);
   }
 
   // --- Merge Group System ---
@@ -600,6 +605,11 @@ canvas {
     }
     for (const gid of toResolve) {
       resolveMergeGroup(gid);
+    }
+
+    // Progressive difficulty: gravity increases with score
+    if (engine) {
+      engine.gravity.y = 2.5 + Math.min(score * 0.005, 2.0);
     }
   }
 

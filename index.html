@@ -355,6 +355,7 @@ canvas {
     drawNextPreview();
 
     Events.on(engine, 'collisionStart', onCollision);
+    registerAfterRender();
 
     Render.run(render);
     runner = Runner.create();
@@ -516,49 +517,50 @@ canvas {
     Events.on(render, 'afterRender', handler);
   }
 
-  // Draw emoji on fruits and ghost preview
-  Events.on(render, 'afterRender', function() {
-    if (!render || !render.context) return;
-    const ctx = render.context;
+  function registerAfterRender() {
+    Events.on(render, 'afterRender', function() {
+      if (!render || !render.context) return;
+      const ctx = render.context;
 
-    // Draw emojis on fruits
-    for (const body of fruitBodies) {
-      if (body.fruitIndex === undefined) continue;
-      const fruit = FRUITS[body.fruitIndex];
-      const r = scaleR(fruit.radius);
-      ctx.save();
-      ctx.translate(body.position.x, body.position.y);
-      ctx.rotate(body.angle);
-      ctx.font = `${r * 0.9}px Arial`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(fruit.emoji, 0, 0);
-      ctx.restore();
-    }
+      // Draw emojis on fruits
+      for (const body of fruitBodies) {
+        if (body.fruitIndex === undefined) continue;
+        const fruit = FRUITS[body.fruitIndex];
+        const r = scaleR(fruit.radius);
+        ctx.save();
+        ctx.translate(body.position.x, body.position.y);
+        ctx.rotate(body.angle);
+        ctx.font = `${r * 0.9}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(fruit.emoji, 0, 0);
+        ctx.restore();
+      }
 
-    // Draw ghost preview fruit at drop position
-    if (canDrop && !gameOver) {
-      const fruit = FRUITS[currentFruitIndex];
-      const r = scaleR(fruit.radius);
-      const clampedX = Math.max(r + 4, Math.min(GAME_W - r - 4, dropX));
+      // Draw ghost preview fruit at drop position
+      if (canDrop && !gameOver) {
+        const fruit = FRUITS[currentFruitIndex];
+        const r = scaleR(fruit.radius);
+        const clampedX = Math.max(r + 4, Math.min(GAME_W - r - 4, dropX));
 
-      ctx.save();
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath();
-      ctx.arc(clampedX, DROP_Y - r, r, 0, Math.PI * 2);
-      ctx.fillStyle = fruit.color;
-      ctx.fill();
-      ctx.strokeStyle = fruit.stroke;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.globalAlpha = 0.7;
-      ctx.font = `${r * 0.9}px Arial`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(fruit.emoji, clampedX, DROP_Y - r);
-      ctx.restore();
-    }
-  });
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.arc(clampedX, DROP_Y - r, r, 0, Math.PI * 2);
+        ctx.fillStyle = fruit.color;
+        ctx.fill();
+        ctx.strokeStyle = fruit.stroke;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.globalAlpha = 0.7;
+        ctx.font = `${r * 0.9}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(fruit.emoji, clampedX, DROP_Y - r);
+        ctx.restore();
+      }
+    });
+  }
 
   function checkGameOver() {
     if (gameOver) return;

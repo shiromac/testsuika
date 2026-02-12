@@ -249,7 +249,7 @@ canvas {
 
   // --- Matter.js setup ---
   const {
-    Engine, Render, Runner, Bodies, Body, Composite, Events, Vector, Query
+    Engine, Render, Runner, Bodies, Body, Composite, Events, Vector, Query, Constraint
   } = Matter;
 
   const container = document.getElementById('game-container');
@@ -270,8 +270,13 @@ canvas {
   let canDrop = true;
   let gameOver = false;
   let fruitBodies = new Set();
-  let merging = new Set();
   let gameOverCheckTimer = null;
+
+  // --- Merge group system ---
+  let mergeGroups = new Map();   // gid -> { fruitIndex, bodies: Set, startTime, constraints: [] }
+  let bodyToGroup = new Map();   // body.id -> gid
+  let nextGroupId = 0;
+  const MERGE_TIME = 5000;      // 5 seconds
 
   const DROP_Y = 60;
   const WALL_THICKNESS = 20;
@@ -298,7 +303,9 @@ canvas {
     gameOver = false;
     canDrop = true;
     fruitBodies = new Set();
-    merging = new Set();
+    mergeGroups = new Map();
+    bodyToGroup = new Map();
+    nextGroupId = 0;
     gameOverOverlay.classList.remove('active');
 
     if (engine) {
@@ -355,6 +362,7 @@ canvas {
     drawNextPreview();
 
     Events.on(engine, 'collisionStart', onCollision);
+    Events.on(engine, 'beforeUpdate', updateMergeGroups);
     registerAfterRender();
 
     Render.run(render);
@@ -396,8 +404,7 @@ canvas {
   }
 
   function drawDropPreview() {
-    // The preview fruit is drawn via the guide line position
-    // and will use afterRender to draw a ghost fruit
+    // Ghost fruit drawn in afterRender
   }
 
   function createFruitBody(x, y, index) {
@@ -442,46 +449,186 @@ canvas {
     }, 400);
   }
 
-  function onCollision(event) {
-    const pairs = event.pairs;
-    for (const pair of pairs) {
-      const { bodyA, bodyB } = pair;
-      if (bodyA.fruitIndex === undefined || bodyB.fruitIndex === undefined) continue;
-      if (bodyA.fruitIndex !== bodyB.fruitIndex) continue;
-      if (merging.has(bodyA.id) || merging.has(bodyB.id)) continue;
-      if (bodyA.fruitIndex >= FRUITS.length - 1) continue;
+  // --- Merge Group System ---
 
-      merging.add(bodyA.id);
-      merging.add(bodyB.id);
+  function createMergeGroup(bodyA, bodyB, fruitIndex) {
+    const gid = nextGroupId++;
+    const constraint = Constraint.create({
+      bodyA: bodyA,
+      bodyB: bodyB,
+      stiffness: 0.02,
+      damping: 0.1,
+      length: 0,
+      render: { visible: false }
+    });
+    Composite.add(engine.world, constraint);
 
-      const newIndex = bodyA.fruitIndex + 1;
-      const midX = (bodyA.position.x + bodyB.position.x) / 2;
-      const midY = (bodyA.position.y + bodyB.position.y) / 2;
+    const group = {
+      fruitIndex,
+      bodies: new Set([bodyA, bodyB]),
+      startTime: Date.now(),
+      constraints: [constraint]
+    };
+    mergeGroups.set(gid, group);
+    bodyToGroup.set(bodyA.id, gid);
+    bodyToGroup.set(bodyB.id, gid);
+  }
 
-      // Remove old
-      fruitBodies.delete(bodyA);
-      fruitBodies.delete(bodyB);
-      Composite.remove(engine.world, bodyA);
-      Composite.remove(engine.world, bodyB);
-      merging.delete(bodyA.id);
-      merging.delete(bodyB.id);
+  function addToMergeGroup(gid, body) {
+    const group = mergeGroups.get(gid);
+    if (!group) return;
 
-      // Create merged fruit
-      const newBody = createFruitBody(midX, midY, newIndex);
-      // Small impulse to make it bounce
-      Body.setVelocity(newBody, { x: 0, y: -2 });
+    // Connect to nearest body in the group
+    let nearest = null;
+    let nearestDist = Infinity;
+    for (const b of group.bodies) {
+      const dx = b.position.x - body.position.x;
+      const dy = b.position.y - body.position.y;
+      const dist = dx * dx + dy * dy;
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = b;
+      }
+    }
 
-      // Score
-      score += FRUITS[newIndex].points;
-      scoreEl.textContent = score;
+    if (nearest) {
+      const constraint = Constraint.create({
+        bodyA: nearest,
+        bodyB: body,
+        stiffness: 0.02,
+        damping: 0.1,
+        length: 0,
+        render: { visible: false }
+      });
+      Composite.add(engine.world, constraint);
+      group.constraints.push(constraint);
+    }
 
-      // Merge effect
-      createMergeEffect(midX, midY, FRUITS[newIndex].color);
+    group.bodies.add(body);
+    bodyToGroup.set(body.id, gid);
+  }
+
+  function joinGroups(gidA, gidB, bodyA, bodyB) {
+    const groupA = mergeGroups.get(gidA);
+    const groupB = mergeGroups.get(gidB);
+    if (!groupA || !groupB) return;
+
+    // Link the two colliding bodies
+    const constraint = Constraint.create({
+      bodyA: bodyA,
+      bodyB: bodyB,
+      stiffness: 0.02,
+      damping: 0.1,
+      length: 0,
+      render: { visible: false }
+    });
+    Composite.add(engine.world, constraint);
+    groupA.constraints.push(constraint);
+
+    // Absorb groupB into groupA
+    for (const b of groupB.bodies) {
+      groupA.bodies.add(b);
+      bodyToGroup.set(b.id, gidA);
+    }
+    for (const c of groupB.constraints) {
+      groupA.constraints.push(c);
+    }
+    // Use the earlier start time
+    groupA.startTime = Math.min(groupA.startTime, groupB.startTime);
+    mergeGroups.delete(gidB);
+  }
+
+  function resolveMergeGroup(gid) {
+    const group = mergeGroups.get(gid);
+    if (!group) return;
+
+    const bodies = [...group.bodies];
+    const count = bodies.length;
+    const fruitIndex = group.fruitIndex;
+
+    // Evolution: 2 fruits -> +1, 3 -> +2, 4 -> +3, etc.
+    const steps = count - 1;
+    const newIndex = Math.min(fruitIndex + steps, FRUITS.length - 1);
+
+    // Centroid
+    let cx = 0, cy = 0;
+    for (const b of bodies) {
+      cx += b.position.x;
+      cy += b.position.y;
+    }
+    cx /= count;
+    cy /= count;
+
+    // Remove constraints
+    for (const c of group.constraints) {
+      try { Composite.remove(engine.world, c); } catch (e) {}
+    }
+
+    // Remove bodies
+    for (const b of bodies) {
+      fruitBodies.delete(b);
+      bodyToGroup.delete(b.id);
+      try { Composite.remove(engine.world, b); } catch (e) {}
+    }
+
+    mergeGroups.delete(gid);
+
+    // Create evolved fruit
+    const newBody = createFruitBody(cx, cy, newIndex);
+    Body.setVelocity(newBody, { x: 0, y: -3 });
+
+    // Score: combo gives multiplier
+    const basePoints = FRUITS[newIndex].points;
+    const scoreGain = count >= 3 ? basePoints * count : basePoints;
+    score += scoreGain;
+    scoreEl.textContent = score;
+
+    // Effects
+    createMergeEffect(cx, cy, FRUITS[newIndex].color);
+    if (count >= 3) {
+      createComboEffect(cx, cy, count, FRUITS[newIndex]);
     }
   }
 
+  function updateMergeGroups() {
+    const now = Date.now();
+    const toResolve = [];
+    for (const [gid, group] of mergeGroups) {
+      if (now - group.startTime >= MERGE_TIME) {
+        toResolve.push(gid);
+      }
+    }
+    for (const gid of toResolve) {
+      resolveMergeGroup(gid);
+    }
+  }
+
+  function onCollision(event) {
+    for (const pair of event.pairs) {
+      const { bodyA, bodyB } = pair;
+      if (bodyA.fruitIndex === undefined || bodyB.fruitIndex === undefined) continue;
+      if (bodyA.fruitIndex !== bodyB.fruitIndex) continue;
+      if (bodyA.fruitIndex >= FRUITS.length - 1) continue;
+
+      const gidA = bodyToGroup.get(bodyA.id);
+      const gidB = bodyToGroup.get(bodyB.id);
+
+      if (gidA !== undefined && gidB !== undefined) {
+        if (gidA === gidB) continue; // already same group
+        joinGroups(gidA, gidB, bodyA, bodyB);
+      } else if (gidA !== undefined) {
+        addToMergeGroup(gidA, bodyB);
+      } else if (gidB !== undefined) {
+        addToMergeGroup(gidB, bodyA);
+      } else {
+        createMergeGroup(bodyA, bodyB, bodyA.fruitIndex);
+      }
+    }
+  }
+
+  // --- Effects ---
+
   function createMergeEffect(x, y, color) {
-    // Simple particle effect using afterRender
     const particles = [];
     for (let i = 0; i < 8; i++) {
       const angle = (Math.PI * 2 / 8) * i;
@@ -493,7 +640,7 @@ canvas {
         color
       });
     }
-    const handler = function() {
+    const handler = function () {
       const ctx = render.context;
       let alive = false;
       for (const p of particles) {
@@ -517,8 +664,48 @@ canvas {
     Events.on(render, 'afterRender', handler);
   }
 
+  function createComboEffect(x, y, count, fruit) {
+    const startTime = Date.now();
+    const handler = function () {
+      const ctx = render.context;
+      const elapsed = Date.now() - startTime;
+      if (elapsed > 2500) {
+        Events.off(render, 'afterRender', handler);
+        return;
+      }
+      const alpha = 1 - elapsed / 2500;
+      const offsetY = -elapsed * 0.04;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+
+      // COMBO text
+      ctx.font = 'bold 28px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 4;
+      ctx.fillStyle = '#ff4444';
+      const text = `x${count} COMBO!`;
+      ctx.strokeText(text, x, y + offsetY - 24);
+      ctx.fillText(text, x, y + offsetY - 24);
+
+      // Evolved fruit name
+      ctx.font = 'bold 20px Arial';
+      ctx.fillStyle = '#ffd700';
+      const nameText = `${fruit.emoji} ${fruit.name}`;
+      ctx.strokeText(nameText, x, y + offsetY + 8);
+      ctx.fillText(nameText, x, y + offsetY + 8);
+
+      ctx.restore();
+    };
+    Events.on(render, 'afterRender', handler);
+  }
+
+  // --- Rendering ---
+
   function registerAfterRender() {
-    Events.on(render, 'afterRender', function() {
+    Events.on(render, 'afterRender', function () {
       if (!render || !render.context) return;
       const ctx = render.context;
 
@@ -534,6 +721,75 @@ canvas {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(fruit.emoji, 0, 0);
+        ctx.restore();
+      }
+
+      // Draw merge group indicators
+      const now = Date.now();
+      for (const [gid, group] of mergeGroups) {
+        const elapsed = now - group.startTime;
+        const remaining = Math.max(0, MERGE_TIME - elapsed);
+        const progress = remaining / MERGE_TIME;
+        const isCombo = group.bodies.size >= 3;
+        const arcColor = isCombo ? '#ff4444' : '#ffaa00';
+        const pulse = isCombo ? 1 + 0.08 * Math.sin(now * 0.012) : 1;
+
+        // Countdown arc on each body
+        for (const body of group.bodies) {
+          const fruit = FRUITS[body.fruitIndex];
+          const r = scaleR(fruit.radius) * pulse;
+
+          ctx.save();
+          ctx.translate(body.position.x, body.position.y);
+
+          // Background ring
+          ctx.beginPath();
+          ctx.arc(0, 0, r + 5, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+          ctx.lineWidth = 4;
+          ctx.stroke();
+
+          // Progress arc (depletes clockwise)
+          ctx.beginPath();
+          ctx.arc(0, 0, r + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress, false);
+          ctx.strokeStyle = arcColor;
+          ctx.lineWidth = 4;
+          ctx.stroke();
+
+          ctx.restore();
+        }
+
+        // Group centroid for text
+        let cx = 0, cy = 0, minY = Infinity;
+        for (const body of group.bodies) {
+          cx += body.position.x;
+          cy += body.position.y;
+          const r = scaleR(FRUITS[body.fruitIndex].radius);
+          if (body.position.y - r < minY) minY = body.position.y - r;
+        }
+        cx /= group.bodies.size;
+
+        // Countdown number
+        const secs = Math.ceil(remaining / 1000);
+        ctx.save();
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.fillStyle = '#fff';
+        ctx.strokeText(secs, cx, minY - 14);
+        ctx.fillText(secs, cx, minY - 14);
+
+        // COMBO indicator when 3+
+        if (isCombo) {
+          ctx.font = 'bold 16px Arial';
+          ctx.fillStyle = '#ff4444';
+          const comboLabel = `x${group.bodies.size} COMBO!`;
+          ctx.strokeText(comboLabel, cx, minY - 34);
+          ctx.fillText(comboLabel, cx, minY - 34);
+        }
+
         ctx.restore();
       }
 
@@ -570,7 +826,6 @@ canvas {
       if (body.position.y - r < DROP_Y &&
           Math.abs(body.velocity.y) < 0.5 &&
           body.speed < 1) {
-        // Give a grace period - the body must be settled
         triggerGameOver();
         return;
       }
@@ -608,7 +863,6 @@ canvas {
   function onDrop(e) {
     if (gameOver) return;
     e.preventDefault();
-    // Update position from the end event if possible
     if (e.changedTouches) {
       const rect = container.getBoundingClientRect();
       dropX = e.changedTouches[0].clientX - rect.left;
@@ -625,7 +879,7 @@ canvas {
 
   // Mouse events (for desktop testing)
   container.addEventListener('mousemove', onMove);
-  container.addEventListener('click', function(e) {
+  container.addEventListener('click', function (e) {
     if (gameOver) return;
     e.preventDefault();
     dropX = getInputX(e);
@@ -636,11 +890,11 @@ canvas {
     dropFruit();
   });
 
-  restartBtn.addEventListener('click', function(e) {
+  restartBtn.addEventListener('click', function (e) {
     e.stopPropagation();
     init();
   });
-  restartBtn.addEventListener('touchend', function(e) {
+  restartBtn.addEventListener('touchend', function (e) {
     e.stopPropagation();
     init();
   });

@@ -677,8 +677,8 @@ canvas {
     }
 
     // --- Eyes ---
-    const eyeY = -r * 0.06;
-    const eyeX = r * 0.28;
+    const eyeY = r * 0.08;
+    const eyeX = r * 0.35;
     const eyeR = r * (v.bigEye ? 0.22 : 0.17);
 
     [-1, 1].forEach(side => {
@@ -714,7 +714,7 @@ canvas {
     });
 
     // --- Nose ---
-    const noseY = r * 0.16;
+    const noseY = r * 0.3;
     ctx.beginPath();
     ctx.moveTo(0, noseY - r * 0.04);
     ctx.lineTo(-r * 0.055, noseY + r * 0.03);
@@ -744,8 +744,8 @@ canvas {
       [-1, 1].forEach(side => {
         for (let i = -1; i <= 1; i++) {
           ctx.beginPath();
-          ctx.moveTo(side * r * 0.16, r * 0.19 + i * r * 0.06);
-          ctx.lineTo(side * r * 0.62, r * 0.13 + i * r * 0.09);
+          ctx.moveTo(side * r * 0.2, r * 0.32 + i * r * 0.06);
+          ctx.lineTo(side * r * 0.65, r * 0.26 + i * r * 0.09);
           ctx.stroke();
         }
       });
@@ -755,7 +755,7 @@ canvas {
     if (v.blush) {
       [-1, 1].forEach(side => {
         ctx.beginPath();
-        ctx.arc(side * r * 0.38, r * 0.13, r * 0.09, 0, Math.PI * 2);
+        ctx.arc(side * r * 0.42, r * 0.2, r * 0.09, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255, 150, 170, 0.35)';
         ctx.fill();
       });

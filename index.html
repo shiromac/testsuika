@@ -93,9 +93,9 @@ body {
   left: 0;
   right: 0;
   height: 60px;
-  background: rgba(245, 230, 200, 0.9);
+  background: rgba(245, 230, 200, 0.2);
   z-index: 10;
-  border-bottom: 2px dashed #c4a265;
+  border-bottom: 2px dashed rgba(196, 162, 101, 0.4);
 }
 
 #guide-line {
@@ -216,19 +216,19 @@ canvas {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
 <script>
 (function() {
-  // --- Cat definitions (bigger sizes, up to ~2x original) ---
+  // --- Cat definitions (sizes 1x~1.5x of original fruit radii) ---
   const FRUITS = [
-    { name: '子猫',         radius: 20,  color: '#ffe4c4', stroke: '#dcc4a4', points: 1,  emoji: '🐱' },
-    { name: 'ミケ猫',       radius: 26,  color: '#f5a623', stroke: '#d4891a', points: 3,  emoji: '😺' },
-    { name: 'シャム猫',     radius: 34,  color: '#d4a574', stroke: '#b8885a', points: 6,  emoji: '😸' },
-    { name: 'マンチカン',   radius: 43,  color: '#f0c060', stroke: '#d4a840', points: 10, emoji: '😻' },
-    { name: 'スコティッシュ', radius: 52, color: '#a8a8a8', stroke: '#888888', points: 15, emoji: '😽' },
-    { name: 'アメショ',     radius: 63,  color: '#c0c0c0', stroke: '#9a9a9a', points: 21, emoji: '😹' },
-    { name: 'ロシアンブルー', radius: 75, color: '#7a9ab5', stroke: '#5e7f99', points: 28, emoji: '😿' },
-    { name: 'ペルシャ',     radius: 88,  color: '#fff0e0', stroke: '#e6d5c0', points: 36, emoji: '😾' },
-    { name: 'メインクーン', radius: 101, color: '#8B6914', stroke: '#6b4f0e', points: 45, emoji: '🙀' },
-    { name: 'ベンガル',     radius: 116, color: '#d4a017', stroke: '#b08614', points: 55, emoji: '🐈' },
-    { name: 'ライオン',     radius: 140, color: '#daa520', stroke: '#b8860b', points: 66, emoji: '🦁' },
+    { name: '子猫',         radius: 15,  color: '#ffe4c4', stroke: '#dcc4a4', points: 1,  emoji: '🐱' },
+    { name: 'ミケ猫',       radius: 20,  color: '#f5a623', stroke: '#d4891a', points: 3,  emoji: '😺' },
+    { name: 'シャム猫',     radius: 26,  color: '#d4a574', stroke: '#b8885a', points: 6,  emoji: '😸' },
+    { name: 'マンチカン',   radius: 33,  color: '#f0c060', stroke: '#d4a840', points: 10, emoji: '😻' },
+    { name: 'スコティッシュ', radius: 41, color: '#a8a8a8', stroke: '#888888', points: 15, emoji: '😽' },
+    { name: 'アメショ',     radius: 50,  color: '#c0c0c0', stroke: '#9a9a9a', points: 21, emoji: '😹' },
+    { name: 'ロシアンブルー', radius: 60, color: '#7a9ab5', stroke: '#5e7f99', points: 28, emoji: '😿' },
+    { name: 'ペルシャ',     radius: 70,  color: '#fff0e0', stroke: '#e6d5c0', points: 36, emoji: '😾' },
+    { name: 'メインクーン', radius: 81,  color: '#8B6914', stroke: '#6b4f0e', points: 45, emoji: '🙀' },
+    { name: 'ベンガル',     radius: 94,  color: '#d4a017', stroke: '#b08614', points: 55, emoji: '🐈' },
+    { name: 'ライオン',     radius: 108, color: '#daa520', stroke: '#b8860b', points: 66, emoji: '🦁' },
   ];
 
   // Build evolution chart
@@ -336,6 +336,145 @@ canvas {
     gain2.connect(audioCtx.destination);
     osc2.start(t);
     osc2.stop(t + 0.36);
+  }
+
+  // --- 派手な「にゃー」: 進化・消滅時用 ---
+  function playBigNyaan(isVanish) {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+
+    const t = audioCtx.currentTime;
+    const baseFreq = isVanish ? 500 + Math.random() * 150 : 650 + Math.random() * 200;
+    const duration = isVanish ? 0.8 : 0.6;
+    const volume = isVanish ? 0.3 : 0.22;
+
+    // Main powerful "NYAA" tone
+    const osc1 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(baseFreq, t);
+    osc1.frequency.linearRampToValueAtTime(baseFreq * 1.5, t + 0.08);
+    osc1.frequency.linearRampToValueAtTime(baseFreq * 1.2, t + 0.2);
+    osc1.frequency.linearRampToValueAtTime(baseFreq * 0.7, t + duration * 0.7);
+    osc1.frequency.linearRampToValueAtTime(baseFreq * 0.4, t + duration);
+    gain1.gain.setValueAtTime(0, t);
+    gain1.gain.linearRampToValueAtTime(volume, t + 0.02);
+    gain1.gain.linearRampToValueAtTime(volume * 0.7, t + duration * 0.5);
+    gain1.gain.linearRampToValueAtTime(0, t + duration);
+    osc1.connect(gain1);
+    gain1.connect(audioCtx.destination);
+    osc1.start(t);
+    osc1.stop(t + duration + 0.01);
+
+    // Rich harmonic layer
+    const osc2 = audioCtx.createOscillator();
+    const gain2 = audioCtx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(baseFreq * 2, t);
+    osc2.frequency.linearRampToValueAtTime(baseFreq * 3, t + 0.08);
+    osc2.frequency.linearRampToValueAtTime(baseFreq * 2.2, t + 0.2);
+    osc2.frequency.linearRampToValueAtTime(baseFreq * 1.4, t + duration);
+    gain2.gain.setValueAtTime(0, t);
+    gain2.gain.linearRampToValueAtTime(volume * 0.35, t + 0.02);
+    gain2.gain.linearRampToValueAtTime(volume * 0.15, t + duration * 0.5);
+    gain2.gain.linearRampToValueAtTime(0, t + duration);
+    osc2.connect(gain2);
+    gain2.connect(audioCtx.destination);
+    osc2.start(t);
+    osc2.stop(t + duration + 0.01);
+
+    // Sub-bass rumble for power
+    const osc3 = audioCtx.createOscillator();
+    const gain3 = audioCtx.createGain();
+    osc3.type = 'sine';
+    osc3.frequency.setValueAtTime(baseFreq * 0.5, t);
+    osc3.frequency.linearRampToValueAtTime(baseFreq * 0.6, t + 0.08);
+    osc3.frequency.linearRampToValueAtTime(baseFreq * 0.35, t + duration);
+    gain3.gain.setValueAtTime(0, t);
+    gain3.gain.linearRampToValueAtTime(volume * 0.25, t + 0.03);
+    gain3.gain.linearRampToValueAtTime(volume * 0.1, t + duration * 0.6);
+    gain3.gain.linearRampToValueAtTime(0, t + duration);
+    osc3.connect(gain3);
+    gain3.connect(audioCtx.destination);
+    osc3.start(t);
+    osc3.stop(t + duration + 0.01);
+
+    if (isVanish) {
+      // Extra shimmer for vanish - delayed echo "nyaa"
+      const osc4 = audioCtx.createOscillator();
+      const gain4 = audioCtx.createGain();
+      osc4.type = 'sine';
+      osc4.frequency.setValueAtTime(baseFreq * 1.3, t + 0.15);
+      osc4.frequency.linearRampToValueAtTime(baseFreq * 1.6, t + 0.22);
+      osc4.frequency.linearRampToValueAtTime(baseFreq * 0.9, t + 0.5);
+      osc4.frequency.linearRampToValueAtTime(baseFreq * 0.5, t + duration);
+      gain4.gain.setValueAtTime(0, t);
+      gain4.gain.setValueAtTime(0, t + 0.14);
+      gain4.gain.linearRampToValueAtTime(volume * 0.5, t + 0.18);
+      gain4.gain.linearRampToValueAtTime(volume * 0.2, t + 0.5);
+      gain4.gain.linearRampToValueAtTime(0, t + duration);
+      osc4.connect(gain4);
+      gain4.connect(audioCtx.destination);
+      osc4.start(t + 0.14);
+      osc4.stop(t + duration + 0.01);
+    }
+  }
+
+  // --- 「にゃー」テキストエフェクト ---
+  function createNyaaEffect(x, y, isVanish) {
+    const startTime = Date.now();
+    const text = isVanish ? 'にゃーーー!!!' : 'にゃー!!';
+    const fontSize = isVanish ? 36 : 28;
+    const effectDuration = isVanish ? 3000 : 2000;
+    const color = isVanish ? '#ff2222' : '#ff6600';
+    const scale0 = isVanish ? 0.3 : 0.5;
+
+    const handler = function () {
+      const ctx = render.context;
+      const elapsed = Date.now() - startTime;
+      if (elapsed > effectDuration) {
+        Events.off(render, 'afterRender', handler);
+        return;
+      }
+
+      const progress = elapsed / effectDuration;
+      const alpha = progress < 0.15 ? progress / 0.15 : 1 - (progress - 0.15) / 0.85;
+      const scale = scale0 + (1 - scale0) * Math.min(1, elapsed / 150);
+      const offsetY = -elapsed * 0.06;
+      const wobble = isVanish ? Math.sin(elapsed * 0.015) * 5 : 0;
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.translate(x + wobble, y + offsetY);
+      ctx.scale(scale, scale);
+
+      ctx.font = `bold ${fontSize}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Glow
+      ctx.shadowColor = color;
+      ctx.shadowBlur = isVanish ? 20 : 12;
+
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = isVanish ? 5 : 4;
+      ctx.strokeText(text, 0, 0);
+      ctx.fillStyle = color;
+      ctx.fillText(text, 0, 0);
+
+      // Inner bright highlight
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#fff';
+      ctx.globalAlpha = Math.max(0, alpha * 0.5);
+      ctx.fillText(text, 0, -1);
+
+      ctx.restore();
+    };
+    Events.on(render, 'afterRender', handler);
   }
 
   function scaleR(radius) {
@@ -482,6 +621,7 @@ canvas {
       fruitIndex: index
     });
     body.fruitIndex = index;
+    body.dropTime = Date.now();
     Composite.add(engine.world, body);
     fruitBodies.add(body);
     return body;
@@ -640,6 +780,8 @@ canvas {
 
     // Effects
     createMergeEffect(cx, cy, FRUITS[newIndex].color);
+    playBigNyaan(false);
+    createNyaaEffect(cx, cy, false);
     if (count >= 3) {
       createComboEffect(cx, cy, count, FRUITS[newIndex]);
     }
@@ -668,7 +810,24 @@ canvas {
       const { bodyA, bodyB } = pair;
       if (bodyA.fruitIndex === undefined || bodyB.fruitIndex === undefined) continue;
       if (bodyA.fruitIndex !== bodyB.fruitIndex) continue;
-      if (bodyA.fruitIndex >= FRUITS.length - 1) continue;
+
+      // Max cat (ライオン): merge and vanish with big bonus
+      if (bodyA.fruitIndex >= FRUITS.length - 1) {
+        if (bodyToGroup.has(bodyA.id) || bodyToGroup.has(bodyB.id)) continue;
+        fruitBodies.delete(bodyA);
+        fruitBodies.delete(bodyB);
+        try { Composite.remove(engine.world, bodyA); } catch(e) {}
+        try { Composite.remove(engine.world, bodyB); } catch(e) {}
+        const mx = (bodyA.position.x + bodyB.position.x) / 2;
+        const my = (bodyA.position.y + bodyB.position.y) / 2;
+        score += 200;
+        scoreEl.textContent = score;
+        createMergeEffect(mx, my, '#ffd700');
+        createComboEffect(mx, my, 2, { emoji: '🦁', name: 'ライオン消滅!' });
+        playBigNyaan(true);
+        createNyaaEffect(mx, my, true);
+        continue;
+      }
 
       const gidA = bodyToGroup.get(bodyA.id);
       const gidB = bodyToGroup.get(bodyB.id);
@@ -874,7 +1033,10 @@ canvas {
 
   function checkGameOver() {
     if (gameOver) return;
+    const now = Date.now();
     for (const body of fruitBodies) {
+      // Grace period: ignore bodies created less than 2s ago
+      if (now - body.dropTime < 2000) continue;
       const r = scaleR(FRUITS[body.fruitIndex].radius);
       if (body.position.y - r < DROP_Y &&
           Math.abs(body.velocity.y) < 0.5 &&

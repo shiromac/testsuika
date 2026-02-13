@@ -231,12 +231,46 @@ canvas {
     { name: 'ライオン',     radius: 108, color: '#daa520', stroke: '#b8860b', points: 66, emoji: '🦁' },
   ];
 
-  // Build evolution chart
+  // --- Cat face visual configs ---
+  const CAT_VISUALS = [
+    { earInner: '#ffb6c1', eye: '#443322', nose: '#ff9999', blush: true },
+    { earInner: '#ffb6c1', eye: '#228B22', nose: '#ff8888', patches: [[-0.3,-0.2,0.35,'#f5a623'],[0.25,0.15,0.3,'rgba(80,60,40,0.5)']] },
+    { earInner: '#8B7355', eye: '#4169E1', nose: '#8B6540', mask: true },
+    { earInner: '#ffb6c1', eye: '#FFD700', nose: '#ff9999', blush: true, bigEye: true },
+    { earInner: '#bbb', eye: '#DAA520', nose: '#aaa', fold: true },
+    { earInner: '#ffb6c1', eye: '#228B22', nose: '#cc8888', stripes: true },
+    { earInner: '#8fa8b5', eye: '#00cc55', nose: '#8899aa' },
+    { earInner: '#ffccdd', eye: '#6699ff', nose: '#ffaaaa', fluffy: true },
+    { earInner: '#6b4f0e', eye: '#DAA520', nose: '#8B6914', tufts: true },
+    { earInner: '#c4a017', eye: '#228B22', nose: '#b08614', spots: true },
+    { earInner: '#c4a265', eye: '#ff8800', nose: '#b8860b', mane: true },
+  ];
+
+  // Build evolution chart with mini cat face canvases
   const evoChart = document.getElementById('evolution-chart');
   FRUITS.forEach((f, i) => {
     const item = document.createElement('span');
     item.className = 'evo-item';
-    item.textContent = f.emoji;
+    const miniCanvas = document.createElement('canvas');
+    const miniSize = 22;
+    const dpr = window.devicePixelRatio || 1;
+    miniCanvas.width = miniSize * dpr;
+    miniCanvas.height = miniSize * dpr;
+    miniCanvas.style.width = miniSize + 'px';
+    miniCanvas.style.height = miniSize + 'px';
+    const mc = miniCanvas.getContext('2d');
+    mc.scale(dpr, dpr);
+    const mr = 8;
+    mc.translate(miniSize / 2, miniSize / 2 + 1);
+    mc.beginPath();
+    mc.arc(0, 0, mr, 0, Math.PI * 2);
+    mc.fillStyle = f.color;
+    mc.fill();
+    mc.strokeStyle = f.stroke;
+    mc.lineWidth = 1;
+    mc.stroke();
+    drawCatFace(mc, mr, i);
+    item.appendChild(miniCanvas);
     item.title = f.name;
     evoChart.appendChild(item);
     if (i < FRUITS.length - 1) {
@@ -477,6 +511,257 @@ canvas {
     Events.on(render, 'afterRender', handler);
   }
 
+  // --- Paw print drawing ---
+  function drawPawPrint(ctx, size) {
+    // Main pad
+    ctx.beginPath();
+    ctx.ellipse(0, size * 0.15, size * 0.38, size * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Toe beans
+    const toes = [[-0.3,-0.28],[- 0.1,-0.42],[0.1,-0.42],[0.3,-0.28]];
+    for (const [tx, ty] of toes) {
+      ctx.beginPath();
+      ctx.arc(size * tx, size * ty, size * 0.15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // --- Cat face drawing ---
+  function drawCatFace(ctx, r, index) {
+    const v = CAT_VISUALS[index];
+    const fur = FRUITS[index].color;
+    const stk = FRUITS[index].stroke;
+    const lw = Math.max(1, r * 0.04);
+
+    // Lion mane
+    if (v.mane) {
+      ctx.beginPath();
+      for (let i = 0; i < 18; i++) {
+        const a = (Math.PI * 2 / 18) * i - Math.PI / 2;
+        const mr = r * 1.28 + Math.sin(i * 3.5) * r * 0.12;
+        if (i === 0) ctx.moveTo(Math.cos(a) * mr, Math.sin(a) * mr);
+        else ctx.lineTo(Math.cos(a) * mr, Math.sin(a) * mr);
+      }
+      ctx.closePath();
+      ctx.fillStyle = '#c4912a';
+      ctx.fill();
+      ctx.strokeStyle = '#a07820';
+      ctx.lineWidth = lw;
+      ctx.stroke();
+    }
+
+    // Persian fluffy outline
+    if (v.fluffy) {
+      ctx.beginPath();
+      for (let i = 0; i < 24; i++) {
+        const a = (Math.PI * 2 / 24) * i - Math.PI / 2;
+        const fr = r * 1.06 + Math.sin(i * 5) * r * 0.05;
+        if (i === 0) ctx.moveTo(Math.cos(a) * fr, Math.sin(a) * fr);
+        else ctx.lineTo(Math.cos(a) * fr, Math.sin(a) * fr);
+      }
+      ctx.closePath();
+      ctx.fillStyle = fur;
+      ctx.fill();
+    }
+
+    // --- Ears ---
+    [-1, 1].forEach(s => {
+      ctx.beginPath();
+      if (v.fold) {
+        ctx.moveTo(s * r * 0.6, -r * 0.4);
+        ctx.quadraticCurveTo(s * r * 0.55, -r * 0.78, s * r * 0.2, -r * 0.6);
+      } else {
+        ctx.moveTo(s * r * 0.7, -r * 0.3);
+        ctx.lineTo(s * r * 0.45, -r * 1.05);
+        ctx.lineTo(s * r * 0.05, -r * 0.55);
+      }
+      ctx.closePath();
+      ctx.fillStyle = fur;
+      ctx.fill();
+      ctx.strokeStyle = stk;
+      ctx.lineWidth = lw;
+      ctx.stroke();
+
+      // Inner ear
+      ctx.beginPath();
+      if (v.fold) {
+        ctx.moveTo(s * r * 0.5, -r * 0.45);
+        ctx.quadraticCurveTo(s * r * 0.48, -r * 0.67, s * r * 0.28, -r * 0.55);
+      } else {
+        ctx.moveTo(s * r * 0.58, -r * 0.38);
+        ctx.lineTo(s * r * 0.43, -r * 0.88);
+        ctx.lineTo(s * r * 0.15, -r * 0.55);
+      }
+      ctx.closePath();
+      ctx.fillStyle = v.earInner;
+      ctx.fill();
+
+      // Maine Coon ear tufts
+      if (v.tufts) {
+        ctx.strokeStyle = stk;
+        ctx.lineWidth = Math.max(1, r * 0.03);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(s * r * 0.48, -r * 1.05);
+        ctx.lineTo(s * r * 0.52, -r * 1.22);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(s * r * 0.42, -r * 1.02);
+        ctx.lineTo(s * r * 0.44, -r * 1.18);
+        ctx.stroke();
+      }
+    });
+
+    // --- Face markings ---
+    // Calico patches
+    if (v.patches) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.95, 0, Math.PI * 2);
+      ctx.clip();
+      for (const [px, py, pr, pc] of v.patches) {
+        ctx.beginPath();
+        ctx.arc(r * px, r * py, r * pr, 0, Math.PI * 2);
+        ctx.fillStyle = pc;
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // Siamese mask
+    if (v.mask) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.95, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.strokeStyle = '#6B4226';
+      ctx.lineWidth = r * 0.25;
+      ctx.globalAlpha = 0.25;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // Tabby M-mark
+    if (v.stripes) {
+      ctx.strokeStyle = '#777';
+      ctx.lineWidth = Math.max(1, r * 0.05);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.22, -r * 0.28);
+      ctx.lineTo(-r * 0.1, -r * 0.42);
+      ctx.lineTo(0, -r * 0.28);
+      ctx.lineTo(r * 0.1, -r * 0.42);
+      ctx.lineTo(r * 0.22, -r * 0.28);
+      ctx.stroke();
+    }
+
+    // Bengal spots
+    if (v.spots) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.9, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.fillStyle = '#8B6914';
+      ctx.globalAlpha = 0.35;
+      const sp = [[-0.35,-0.22,0.09],[0.33,-0.18,0.08],[-0.2,0.32,0.08],[0.28,0.34,0.09],[-0.42,0.1,0.07],[0.42,0.05,0.07]];
+      for (const [sx, sy, sr] of sp) {
+        ctx.beginPath();
+        ctx.arc(r * sx, r * sy, r * sr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // --- Eyes ---
+    const eyeY = -r * 0.06;
+    const eyeX = r * 0.28;
+    const eyeR = r * (v.bigEye ? 0.22 : 0.17);
+
+    [-1, 1].forEach(side => {
+      const ex = side * eyeX;
+      // White
+      ctx.beginPath();
+      ctx.ellipse(ex, eyeY, eyeR, eyeR * 1.15, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = Math.max(0.5, r * 0.02);
+      ctx.stroke();
+      // Iris
+      const iR = eyeR * 0.72;
+      ctx.beginPath();
+      ctx.arc(ex, eyeY + eyeR * 0.05, iR, 0, Math.PI * 2);
+      ctx.fillStyle = v.eye;
+      ctx.fill();
+      // Pupil
+      ctx.beginPath();
+      ctx.ellipse(ex, eyeY + eyeR * 0.05, iR * 0.38, iR * 0.62, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#111';
+      ctx.fill();
+      // Highlights
+      ctx.beginPath();
+      ctx.arc(ex + eyeR * 0.2, eyeY - eyeR * 0.18, eyeR * 0.2, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(ex - eyeR * 0.12, eyeY + eyeR * 0.18, eyeR * 0.09, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fill();
+    });
+
+    // --- Nose ---
+    const noseY = r * 0.16;
+    ctx.beginPath();
+    ctx.moveTo(0, noseY - r * 0.04);
+    ctx.lineTo(-r * 0.055, noseY + r * 0.03);
+    ctx.quadraticCurveTo(0, noseY + r * 0.05, r * 0.055, noseY + r * 0.03);
+    ctx.closePath();
+    ctx.fillStyle = v.nose;
+    ctx.fill();
+
+    // --- Mouth ---
+    const mY = noseY + r * 0.03;
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = Math.max(0.5, r * 0.025);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, mY);
+    ctx.quadraticCurveTo(-r * 0.09, mY + r * 0.11, -r * 0.13, mY + r * 0.06);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, mY);
+    ctx.quadraticCurveTo(r * 0.09, mY + r * 0.11, r * 0.13, mY + r * 0.06);
+    ctx.stroke();
+
+    // --- Whiskers ---
+    if (r >= 18) {
+      ctx.strokeStyle = 'rgba(100,100,100,0.45)';
+      ctx.lineWidth = Math.max(0.5, r * 0.015);
+      [-1, 1].forEach(side => {
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(side * r * 0.16, r * 0.19 + i * r * 0.06);
+          ctx.lineTo(side * r * 0.62, r * 0.13 + i * r * 0.09);
+          ctx.stroke();
+        }
+      });
+    }
+
+    // --- Blush ---
+    if (v.blush) {
+      [-1, 1].forEach(side => {
+        ctx.beginPath();
+        ctx.arc(side * r * 0.38, r * 0.13, r * 0.09, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 150, 170, 0.35)';
+        ctx.fill();
+      });
+    }
+  }
+
   function scaleR(radius) {
     return radius * (GAME_W / 400);
   }
@@ -590,11 +875,10 @@ canvas {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    ctx.fillStyle = '#fff';
-    ctx.font = `${previewR * 1.1}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(fruit.emoji, size / 2, size / 2);
+    ctx.save();
+    ctx.translate(size / 2, size / 2);
+    drawCatFace(ctx, previewR, nextFruitIndex);
+    ctx.restore();
   }
 
   function drawDropPreview() {
@@ -851,12 +1135,15 @@ canvas {
     const particles = [];
     for (let i = 0; i < 8; i++) {
       const angle = (Math.PI * 2 / 8) * i;
+      const speed = 2.5 + Math.random() * 1.5;
       particles.push({
         x, y,
-        vx: Math.cos(angle) * 3,
-        vy: Math.sin(angle) * 3,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
         life: 1,
-        color
+        color,
+        rot: Math.random() * Math.PI * 2,
+        size: 5 + Math.random() * 3
       });
     }
     const handler = function () {
@@ -865,15 +1152,17 @@ canvas {
       for (const p of particles) {
         p.x += p.vx;
         p.y += p.vy;
-        p.life -= 0.05;
+        p.vy += 0.08;
+        p.life -= 0.04;
+        p.rot += 0.05;
         if (p.life <= 0) continue;
         alive = true;
         ctx.save();
         ctx.globalAlpha = p.life;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
         ctx.fillStyle = p.color;
-        ctx.fill();
+        drawPawPrint(ctx, p.size);
         ctx.restore();
       }
       if (!alive) {
@@ -926,7 +1215,7 @@ canvas {
       if (!render || !render.context) return;
       const ctx = render.context;
 
-      // Draw emojis on cats
+      // Draw cat faces on bodies
       for (const body of fruitBodies) {
         if (body.fruitIndex === undefined) continue;
         const fruit = FRUITS[body.fruitIndex];
@@ -934,10 +1223,7 @@ canvas {
         ctx.save();
         ctx.translate(body.position.x, body.position.y);
         ctx.rotate(body.angle);
-        ctx.font = `${r * 0.9}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(fruit.emoji, 0, 0);
+        drawCatFace(ctx, r, body.fruitIndex);
         ctx.restore();
       }
 
@@ -1013,19 +1299,16 @@ canvas {
         const clampedX = Math.max(r + 4, Math.min(GAME_W - r - 4, dropX));
 
         ctx.save();
-        ctx.globalAlpha = 0.8;
+        ctx.globalAlpha = 0.7;
+        ctx.translate(clampedX, DROP_Y - r);
         ctx.beginPath();
-        ctx.arc(clampedX, DROP_Y - r, r, 0, Math.PI * 2);
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
         ctx.fillStyle = fruit.color;
         ctx.fill();
         ctx.strokeStyle = fruit.stroke;
         ctx.lineWidth = 2;
         ctx.stroke();
-        ctx.globalAlpha = 0.9;
-        ctx.font = `${r * 0.9}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(fruit.emoji, clampedX, DROP_Y - r);
+        drawCatFace(ctx, r, currentFruitIndex);
         ctx.restore();
       }
     });

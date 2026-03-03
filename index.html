@@ -691,24 +691,26 @@ canvas {
       ctx.strokeStyle = '#666';
       ctx.lineWidth = Math.max(0.5, r * 0.02);
       ctx.stroke();
-      // Iris
-      const iR = eyeR * 0.72;
+      // Iris (shifted inward for cross-eyed look)
+      const iR = eyeR * 0.85;
+      const irisX = ex - side * eyeR * 0.2;
+      const irisY = eyeY + eyeR * 0.05;
       ctx.beginPath();
-      ctx.arc(ex, eyeY + eyeR * 0.05, iR, 0, Math.PI * 2);
+      ctx.arc(irisX, irisY, iR, 0, Math.PI * 2);
       ctx.fillStyle = v.eye;
       ctx.fill();
       // Pupil
       ctx.beginPath();
-      ctx.ellipse(ex, eyeY + eyeR * 0.05, iR * 0.38, iR * 0.62, 0, 0, Math.PI * 2);
+      ctx.ellipse(irisX, irisY, iR * 0.45, iR * 0.7, 0, 0, Math.PI * 2);
       ctx.fillStyle = '#111';
       ctx.fill();
       // Highlights
       ctx.beginPath();
-      ctx.arc(ex + eyeR * 0.2, eyeY - eyeR * 0.18, eyeR * 0.2, 0, Math.PI * 2);
+      ctx.arc(irisX + eyeR * 0.15, eyeY - eyeR * 0.2, eyeR * 0.22, 0, Math.PI * 2);
       ctx.fillStyle = '#fff';
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(ex - eyeR * 0.12, eyeY + eyeR * 0.18, eyeR * 0.09, 0, Math.PI * 2);
+      ctx.arc(irisX - eyeR * 0.1, eyeY + eyeR * 0.15, eyeR * 0.1, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(255,255,255,0.6)';
       ctx.fill();
     });

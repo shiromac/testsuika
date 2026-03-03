@@ -54,6 +54,18 @@ body {
   color: #5a3e1b;
 }
 
+#high-score-label {
+  font-size: 9px;
+  color: #b8860b;
+  margin-top: 2px;
+}
+
+#high-score {
+  font-size: 16px;
+  font-weight: bold;
+  color: #b8860b;
+}
+
 #next-area {
   background: #f5e6c8;
   border-radius: 12px;
@@ -193,6 +205,8 @@ canvas {
   <div id="score-area">
     <div id="score-label">SCORE</div>
     <div id="score">0</div>
+    <div id="high-score-label">BEST</div>
+    <div id="high-score">0</div>
   </div>
   <div id="next-area">
     <div id="next-label">NEXT</div>
@@ -294,10 +308,13 @@ canvas {
   const gameOverOverlay = document.getElementById('game-over-overlay');
   const finalScoreEl = document.getElementById('final-score');
   const restartBtn = document.getElementById('restart-btn');
+  const highScoreEl = document.getElementById('high-score');
 
   let GAME_W, GAME_H;
   let engine, render, runner;
   let score = 0;
+  let highScore = parseInt(localStorage.getItem('catSuikaHighScore') || '0', 10);
+  highScoreEl.textContent = highScore;
   let currentFruitIndex = 0;
   let nextFruitIndex = 0;
   let dropX = 0;
@@ -1339,7 +1356,14 @@ canvas {
     canDrop = false;
     if (gameOverCheckTimer) clearInterval(gameOverCheckTimer);
 
-    finalScoreEl.textContent = `スコア: ${score}`;
+    if (score > highScore) {
+      highScore = score;
+      localStorage.setItem('catSuikaHighScore', String(highScore));
+      highScoreEl.textContent = highScore;
+      finalScoreEl.textContent = `スコア: ${score} 🎉 NEW BEST!`;
+    } else {
+      finalScoreEl.textContent = `スコア: ${score}`;
+    }
     gameOverOverlay.classList.add('active');
   }
 
